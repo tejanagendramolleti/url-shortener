@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TenetLink - Modern URL Shortener & Link Manager</title>
+    <meta name="description" content="Fast, reliable, and paginated URL Shortener service with description mapping.">
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Angular Script CDN -->
+    <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.8.2/angular.min.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.8.2/angular-animate.min.js"></script>
+    
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body ng-app="urlShortenerApp" ng-controller="MainController as vm">
+
+    <!-- Toast Notification -->
+    <div class="toast-container">
+        <div class="toast" ng-class="{'show': vm.toast.visible, 'error': vm.toast.isError}">
+            <i class="fa-solid" ng-class="vm.toast.isError ? 'fa-circle-exclamation' : 'fa-circle-check'"></i>
+            <span>{{ vm.toast.message }}</span>
+        </div>
+    </div>
+
+    <!-- Navigation Header -->
+    <nav class="navbar">
+        <div class="nav-brand">
+            <div class="brand-icon">
+                <i class="fa-solid fa-link"></i>
+            </div>
+            <div class="brand-text">
+                <span class="brand-title">TenetLink</span>
+                <span class="brand-badge">PRO</span>
+            </div>
+        </div>
+        <div class="nav-status">
+            <span class="status-indicator"></span>
+            <span class="status-text">Server Online: {{ vm.serverHost }}</span>
+        </div>
+    </nav>
+
+    <!-- Main Container -->
+    <main class="main-container">
+        
+        <!-- Hero Section & Shortener Form -->
+        <section class="hero-section">
+            <div class="hero-content">
+                <h1 class="hero-title">Shorten, Track & Manage <span class="gradient-text">Your Links</span></h1>
+                <p class="hero-subtitle">Create short, memorable links with custom descriptions. Access paginated analytics from anywhere in the world.</p>
+            </div>
+
+            <div class="card shortener-card">
+                <form ng-submit="vm.createShortUrl()" class="shortener-form">
+                    
+                    <div class="form-row">
+                        <div class="form-group flex-2">
+                            <label for="originalUrl"><i class="fa-solid fa-globe"></i> Destination URL *</label>
+                            <div class="input-wrapper">
+                                <input type="url" id="originalUrl" ng-model="vm.newUrl.originalUrl" required 
+                                       placeholder="https://example.com/long-destination-url-to-shorten" class="form-input">
+                            </div>
+                        </div>
+                        
+                        <div class="form-group flex-1">
+                            <label for="customKey"><i class="fa-solid fa-key"></i> Custom Key (Optional)</label>
+                            <div class="input-wrapper">
+                                <input type="text" id="customKey" ng-model="vm.newUrl.customKey" 
+                                       placeholder="e.g. my-link-2026" class="form-input">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group flex-full">
+                            <label for="description"><i class="fa-solid fa-align-left"></i> Description / Short Name</label>
+                            <div class="input-wrapper">
+                                <input type="text" id="description" ng-model="vm.newUrl.description" 
+                                       placeholder="e.g. Hyderabad Event Registration Page" class="form-input">
+                            </div>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary btn-submit" ng-disabled="vm.loading">
+                        <span ng-if="!vm.loading"><i class="fa-solid fa-wand-magic-sparkles"></i> Shorten URL</span>
+                        <span ng-if="vm.loading"><i class="fa-solid fa-spinner fa-spin"></i> Processing...</span>
+                    </button>
+
+                </form>
+
+                <!-- Created Result Banner -->
+                <div class="result-banner" ng-if="vm.createdResult">
+                    <div class="result-header">
+                        <i class="fa-solid fa-circle-check"></i> Short URL Generated Successfully!
+                    </div>
+                    <div class="result-body">
+                        <div class="result-link">
+                            <a ng-href="{{ vm.createdResult.shortUrl }}" target="_blank" id="generatedShortUrl">{{ vm.createdResult.shortUrl }}</a>
+                        </div>
+                        <button class="btn btn-secondary btn-copy" ng-click="vm.copyToClipboard(vm.createdResult.shortUrl)">
+                            <i class="fa-regular fa-copy"></i> Copy Link
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Dashboard Links Section -->
+        <section class="links-section">
+            <div class="section-header">
+                <div class="section-title">
+                    <h2><i class="fa-solid fa-list-check"></i> Manage Links</h2>
+                    <span class="count-badge" ng-if="vm.pagination.totalElements >= 0">{{ vm.pagination.totalElements }} Total Links</span>
+                </div>
+
+                <!-- Search & Filters -->
+                <div class="search-bar">
+                    <div class="search-input-wrapper">
+                        <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                        <input type="text" ng-model="vm.searchQuery" ng-change="vm.onSearchChange()" 
+                               placeholder="Search links by name, key, or URL..." class="search-input">
+                        <button class="btn-clear" ng-if="vm.searchQuery" ng-click="vm.clearSearch()">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Table Container -->
+            <div class="card table-card">
+                <div class="table-responsive">
+                    <table class="links-table">
+                        <thead>
+                            <tr>
+                                <th>Description / Name</th>
+                                <th>Short Link</th>
+                                <th>Original Destination</th>
+                                <th>Created Date</th>
+                                <th class="text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr ng-if="vm.fetching">
+                                <td colspan="5" class="text-center py-5">
+                                    <div class="spinner"><i class="fa-solid fa-spinner fa-spin fa-2x"></i></div>
+                                    <p class="mt-2 text-muted">Loading links from server...</p>
+                                </td>
+                            </tr>
+                            <tr ng-if="!vm.fetching && vm.links.length === 0">
+                                <td colspan="5" class="text-center py-5">
+                                    <div class="empty-state">
+                                        <i class="fa-solid fa-link-slash fa-3x"></i>
+                                        <h3>No Short Links Found</h3>
+                                        <p class="text-muted">Create your first shortened link using the form above.</p>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr ng-repeat="item in vm.links" class="table-row">
+                                <td class="col-desc">
+                                    <div class="desc-title">{{ item.description || 'Untitled Link' }}</div>
+                                    <span class="short-key-badge"><i class="fa-solid fa-key"></i> {{ item.shortKey }}</span>
+                                </td>
+                                <td class="col-short">
+                                    <a ng-href="{{ item.shortUrl }}" target="_blank" class="short-link">{{ item.shortUrl }}</a>
+                                </td>
+                                <td class="col-original">
+                                    <span class="original-url" title="{{ item.originalUrl }}">{{ item.originalUrl }}</span>
+                                </td>
+                                <td class="col-date">
+                                    <span class="date-text"><i class="fa-regular fa-clock"></i> {{ vm.formatDate(item.createdAt) }}</span>
+                                </td>
+                                <td class="col-actions text-right">
+                                    <button class="btn-icon" ng-click="vm.copyToClipboard(item.shortUrl)" title="Copy Short Link">
+                                        <i class="fa-regular fa-copy"></i>
+                                    </button>
+                                    <a ng-href="{{ item.shortUrl }}" target="_blank" class="btn-icon btn-visit" title="Visit Link">
+                                        <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Pagination Footer -->
+                <div class="pagination-footer" ng-if="!vm.fetching && vm.links.length > 0">
+                    <div class="page-size">
+                        <label for="pageSize">Per page:</label>
+                        <select id="pageSize" ng-model="vm.pageSize" ng-change="vm.onPageSizeChange()" class="select-input">
+                            <option ng-value="5">5</option>
+                            <option ng-value="10">10</option>
+                            <option ng-value="25">25</option>
+                        </select>
+                    </div>
+
+                    <div class="pagination-info">
+                        Showing Page {{ vm.pagination.number + 1 }} of {{ vm.pagination.totalPages || 1 }}
+                    </div>
+
+                    <div class="pagination-controls">
+                        <button class="btn-page" ng-disabled="vm.pagination.first" ng-click="vm.goToPage(vm.pagination.number - 1)">
+                            <i class="fa-solid fa-chevron-left"></i> Prev
+                        </button>
+                        
+                        <span class="page-number current">{{ vm.pagination.number + 1 }}</span>
+                        
+                        <button class="btn-page" ng-disabled="vm.pagination.last" ng-click="vm.goToPage(vm.pagination.number + 1)">
+                            Next <i class="fa-solid fa-chevron-right"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <footer class="footer">
+        <p>SwiftLink URL Shortener &bull; Spring Boot + MySQL + Angular Application</p>
+    </footer>
+
+    <script src="app.js"></script>
+</body>
+</html>
